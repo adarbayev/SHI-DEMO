@@ -1,0 +1,55 @@
+export const scenarios = [
+  {
+    id: 'bau',
+    name: 'Business as usual',
+    type: 'baseline',
+    description: 'Operational growth with grid decarbonisation only.',
+    owner: 'Facilities / Sustainability',
+    status: 'baseline',
+    investmentProfile: 'Reference case',
+    notes: 'Used as the comparison pathway before decarbonisation measures are applied.',
+    measures: [],
+  },
+  {
+    id: 'low_effort',
+    name: 'Low effort / low investment',
+    type: 'decarbonisation',
+    description: 'Controls, scheduling, and fast operational upgrades with visible decarbonisation and energy savings.',
+    owner: 'Facilities',
+    status: 'working case',
+    investmentProfile: 'Low capex',
+    notes: 'Prioritises fast operational controls and lower-disruption efficiency measures that reduce both kWh and spend.',
+    measures: [],
+  },
+  {
+    id: 'high_investment',
+    name: 'High investment',
+    type: 'decarbonisation',
+    description: 'Deeper capital programmes across data centre, heating, clean power and renewable supply contracts.',
+    owner: 'Facilities / Finance',
+    status: 'investment case',
+    investmentProfile: 'Capital programme',
+    notes:
+      'Explores deeper decarbonisation potential where capital projects and contracted clean power are available, including larger savings potential.',
+    measures: [],
+  },
+]
+
+export const defaultBauAssumptions = {
+  startYear: 2025,
+  endYear: 2050,
+  electricityGrowthRate: 0.035,
+  fuelGrowthRate: 0.015,
+  energyPriceEscalationRate: 0.03,
+  gridDecarbonisationRate: 0.005,
+  siteExpansionGrowthRate: 0.005,
+  emissionsView: 'location_based',
+  includedSiteIds: [
+    'shi-hq-nj',
+    'ridge-dcf-nj',
+    'euc-nj',
+    'nexus-uk',
+    'issy-fr',
+    'leased-office-demo',
+  ],
+}
