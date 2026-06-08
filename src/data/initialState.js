@@ -2,6 +2,7 @@ import { baselineEnergy2026 } from './seedEnergy'
 import { emissionFactors } from './seedEmissionFactors'
 import { defaultMeasures } from './seedMeasures'
 import { operationalMonthlyData } from './seedOperationalData'
+import { people } from './seedPeople'
 import { defaultBauAssumptions, scenarios } from './seedScenarios'
 import { sites, legalEntities } from './seedSites'
 import { defaultTarget } from './seedTargets'
@@ -9,7 +10,7 @@ import { deriveBaselineEnergyFromOperationalData } from '../lib/operationalEngin
 
 export function createInitialState() {
   return structuredClone({
-    demoDataVersion: 10,
+    demoDataVersion: 11,
     bauAssumptions: defaultBauAssumptions,
     targetSettings: defaultTarget,
     internalCarbonPriceUsdPerTco2e: 75,
@@ -18,6 +19,7 @@ export function createInitialState() {
     maccView: 'gross',
     sites,
     legalEntities,
+    people,
     baselineEnergy: deriveBaselineEnergyFromOperationalData(operationalMonthlyData, baselineEnergy2026),
     operationalMonthlyData,
     emissionFactors,

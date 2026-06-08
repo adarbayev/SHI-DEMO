@@ -9,7 +9,7 @@ import { createInitialState } from './data/initialState'
 import { calculateBauProjection } from './lib/projectionEngine'
 import { applyMeasuresToProjection } from './lib/measureEngine'
 import { calculateMeasureFinanceRows } from './lib/maccEngine'
-import { getResponsiblePerson } from './lib/measureWorkflow'
+import { advanceMeasureWorkflow, getResponsiblePerson, normaliseMeasureStatus } from './lib/measureWorkflow'
 import { calculateTargetEmissions, calculateTargetPathway, normaliseTargetSettings } from './lib/targetEngine'
 import { clearStoredState, loadStoredState, saveStoredState } from './lib/storage'
 
@@ -61,6 +61,7 @@ function reducer(state, action) {
       const measure = {
         ...action.measure,
         id: makeMeasureId(action.measure.name),
+        status: normaliseMeasureStatus(action.measure.status),
       }
       return { ...state, measures: [...state.measures, measure] }
     }
@@ -68,7 +69,9 @@ function reducer(state, action) {
       return {
         ...state,
         measures: state.measures.map((measure) =>
-          measure.id === action.measure.id ? action.measure : measure,
+          measure.id === action.measure.id
+            ? { ...action.measure, status: normaliseMeasureStatus(action.measure.status) }
+            : measure,
         ),
       }
     case 'DELETE_MEASURE':
@@ -83,14 +86,23 @@ function reducer(state, action) {
         ...source,
         id: makeMeasureId(`${source.name} copy`),
         name: `${source.name} copy`,
-        status: 'proposed',
+        status: 'draft',
         validationStage: 'Not submitted',
         progressPercent: 0,
-        responsiblePerson: source.owner ?? 'Unassigned',
+        responsiblePersonId: source.responsiblePersonId,
+        validatorPersonId: source.validatorPersonId,
+        responsiblePerson: source.responsiblePerson ?? source.owner ?? 'Unassigned',
         nextAction: 'Prepare validation pack',
       }
       return { ...state, measures: [...state.measures, copy] }
     }
+    case 'ADVANCE_MEASURE_WORKFLOW':
+      return {
+        ...state,
+        measures: state.measures.map((measure) =>
+          measure.id === action.measureId ? advanceMeasureWorkflow(measure, state.people) : measure,
+        ),
+      }
     case 'SUBMIT_MEASURE_FOR_VALIDATION':
       return {
         ...state,
@@ -101,6 +113,7 @@ function reducer(state, action) {
                 status: 'validation_requested',
                 validationStage: 'Awaiting sustainability validation',
                 progressPercent: Math.max(measure.progressPercent ?? 0, 25),
+                validatorPersonId: measure.validatorPersonId || 'person-sustainability-validator',
                 nextAction: measure.nextAction || 'Sustainability review and finance sign-off',
               }
             : measure,
@@ -113,9 +126,9 @@ function reducer(state, action) {
           measure.id === action.measureId
             ? {
                 ...measure,
-                status: 'approved',
+                status: 'validated',
                 validationStage: 'Validated and assigned',
-                responsiblePerson: getResponsiblePerson(measure),
+                responsiblePerson: getResponsiblePerson(measure, state.people),
                 progressPercent: Math.max(measure.progressPercent ?? 0, 40),
                 nextAction: measure.nextAction || 'Owner to confirm implementation plan',
               }
@@ -140,6 +153,7 @@ function initialiseState() {
     ...stored,
     sites: initial.sites,
     legalEntities: initial.legalEntities,
+    people: initial.people,
     baselineEnergy: initial.baselineEnergy,
     operationalMonthlyData: initial.operationalMonthlyData,
     emissionFactors: initial.emissionFactors,
@@ -305,15 +319,13 @@ export default function App() {
           <MeasurePlannerView
             state={state}
             financeRowsByScenario={financeRowsByScenario}
-            onSelectScenario={(scenarioId) => dispatch({ type: 'SELECT_SCENARIO', scenarioId })}
             onAddMeasure={(measure) => dispatch({ type: 'ADD_MEASURE', measure })}
             onUpdateMeasure={(measure) => dispatch({ type: 'UPDATE_MEASURE', measure })}
             onDuplicateMeasure={(measureId) => dispatch({ type: 'DUPLICATE_MEASURE', measureId })}
             onDeleteMeasure={(measureId) => dispatch({ type: 'DELETE_MEASURE', measureId })}
-            onSubmitForValidation={(measureId) =>
-              dispatch({ type: 'SUBMIT_MEASURE_FOR_VALIDATION', measureId })
+            onAdvanceWorkflow={(measureId) =>
+              dispatch({ type: 'ADVANCE_MEASURE_WORKFLOW', measureId })
             }
-            onValidateMeasure={(measureId) => dispatch({ type: 'VALIDATE_MEASURE', measureId })}
           />
         ) : null}
         {activeTab === 'finance' ? (

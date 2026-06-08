@@ -1,9 +1,18 @@
 import { useMemo, useState } from 'react'
-import { Plus, Save, Trash2, X } from 'lucide-react'
+import { ArrowRight, CalendarDays, Plus, Save, ShieldCheck, Trash2, UserRound, X } from 'lucide-react'
 import clsx from 'clsx'
 import { energyIndicators, measureCategories, scopeOptions } from '../data/seedMeasures'
-import { parseNumber } from '../lib/formatters'
-import { measureStatusOptions } from '../lib/measureWorkflow'
+import { formatCurrency, formatEmissions, parseNumber } from '../lib/formatters'
+import {
+  advanceMeasureWorkflow,
+  getMeasureProgress,
+  getMeasureStatusLabel,
+  getNextWorkflowAction,
+  getResponsiblePerson,
+  getValidatorPerson,
+  measureStatusOptions,
+  normaliseMeasureStatus,
+} from '../lib/measureWorkflow'
 import { Field, InfoTooltip, NumberInput, SelectInput, TextInput } from './Field'
 
 function createBlankMeasure(defaultScenarioId, defaultSiteId) {
@@ -23,9 +32,12 @@ function createBlankMeasure(defaultScenarioId, defaultSiteId) {
     reductionValue: 0.05,
     internalCarbonPriceEligible: true,
     owner: 'Facilities',
+    responsiblePersonId: 'person-facilities-lead',
+    validatorPersonId: 'person-sustainability-validator',
     responsiblePerson: 'Facilities lead',
-    status: 'proposed',
+    status: 'draft',
     validationStage: 'Not submitted',
+    dueDate: '2027-06-30',
     progressPercent: 0,
     nextAction: 'Prepare validation pack',
     notes: '',
@@ -48,12 +60,19 @@ function categoryDefaults(category) {
   return defaults[category] ?? defaults['Custom measure']
 }
 
+function personOptionLabel(person) {
+  return `${person.name} | ${person.role}`
+}
+
 export default function MeasureForm({
   sites,
   scenarios,
+  people = [],
   selectedScenarioId,
   editingMeasure,
+  finance,
   onSubmit,
+  onAdvanceWorkflow,
   onCancel,
   onDelete,
   surface = 'panel',
@@ -64,7 +83,9 @@ export default function MeasureForm({
     [scenarios],
   )
   const [form, setForm] = useState(() =>
-    editingMeasure ?? createBlankMeasure(selectedScenarioId, sites[0]?.id),
+    editingMeasure
+      ? { ...editingMeasure, status: normaliseMeasureStatus(editingMeasure.status) }
+      : createBlankMeasure(selectedScenarioId, sites[0]?.id),
   )
 
   function update(key, value) {
@@ -82,20 +103,31 @@ export default function MeasureForm({
     }))
   }
 
+  function advanceWorkflow() {
+    if (!form.id || !onAdvanceWorkflow) return
+    setForm((current) => advanceMeasureWorkflow(current, people))
+    onAdvanceWorkflow(form.id)
+  }
+
   function submit(event) {
     event.preventDefault()
+    const responsiblePerson = people.find((person) => person.id === form.responsiblePersonId)
+    const validatorPerson = people.find((person) => person.id === form.validatorPersonId)
     const payload = {
       ...form,
       id: form.id,
       name: form.name.trim() || `${form.category} measure`,
+      status: normaliseMeasureStatus(form.status),
       startYear: parseNumber(form.startYear, 2027),
       phaseInYears: Math.max(1, parseNumber(form.phaseInYears, 1)),
       usefulLifeYears: Math.max(1, parseNumber(form.usefulLifeYears, 10)),
       capexUsd: parseNumber(form.capexUsd, 0),
       annualOpexChangeUsd: parseNumber(form.annualOpexChangeUsd, 0),
       progressPercent: Math.max(0, Math.min(100, parseNumber(form.progressPercent, 0))),
-      responsiblePerson: form.responsiblePerson?.trim() || form.owner?.trim() || 'Unassigned',
+      responsiblePerson: responsiblePerson?.name || form.responsiblePerson?.trim() || form.owner?.trim() || 'Unassigned',
+      validatorPerson: validatorPerson?.name || form.validatorPerson?.trim() || 'Not assigned',
       validationStage: form.validationStage?.trim() || 'Not submitted',
+      dueDate: form.dueDate || '',
       nextAction: form.nextAction?.trim() || 'Prepare validation pack',
       reductionValue:
         form.reductionType === 'percentage'
@@ -122,6 +154,8 @@ export default function MeasureForm({
           : form.reductionValue * 100
         : ''
       : form.reductionValue
+  const workflowAction = form.id ? getNextWorkflowAction(form) : null
+  const progress = getMeasureProgress(form)
 
   return (
     <form className={clsx(surface === 'panel' && 'panel')} onSubmit={submit}>
@@ -131,7 +165,151 @@ export default function MeasureForm({
           <span>Energy indicator specific</span>
         </div>
       ) : null}
-      <div className="mt-4 grid gap-3">
+      <div className="mt-4 grid gap-4">
+        <section className="rounded-md border border-shi-accent/20 bg-gradient-to-br from-white to-blue-50/60 p-4">
+          <div className="section-heading border-blue-100">
+            <div>
+              <p>Validation workflow</p>
+              <span>{getMeasureStatusLabel(form.status)}</span>
+            </div>
+            {workflowAction ? (
+              <button type="button" className="btn-primary" onClick={advanceWorkflow}>
+                <ArrowRight size={16} />
+                {workflowAction.actionLabel}
+              </button>
+            ) : (
+              <span className="status-badge">No next workflow action</span>
+            )}
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <div className="rounded-md border border-white/80 bg-white/85 p-3">
+              <p className="text-xs font-semibold uppercase text-slate-500">Status</p>
+              <p className="mt-2 text-lg font-semibold text-shi-blue">{getMeasureStatusLabel(form.status)}</p>
+            </div>
+            <div className="rounded-md border border-white/80 bg-white/85 p-3">
+              <p className="text-xs font-semibold uppercase text-slate-500">Responsible</p>
+              <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-shi-blue">
+                <UserRound size={15} />
+                {getResponsiblePerson(form, people)}
+              </p>
+            </div>
+            <div className="rounded-md border border-white/80 bg-white/85 p-3">
+              <p className="text-xs font-semibold uppercase text-slate-500">Validator</p>
+              <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-shi-blue">
+                <ShieldCheck size={15} />
+                {getValidatorPerson(form, people)}
+              </p>
+            </div>
+            <div className="rounded-md border border-white/80 bg-white/85 p-3">
+              <p className="text-xs font-semibold uppercase text-slate-500">Due date</p>
+              <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-shi-blue">
+                <CalendarDays size={15} />
+                {form.dueDate || 'Not set'}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="h-2 rounded-full bg-white">
+              <div className="h-2 rounded-full bg-shi-accent" style={{ width: `${progress}%` }} />
+            </div>
+            <div className="mt-1 flex justify-between text-xs font-semibold text-slate-500">
+              <span>{Math.round(progress)}% progress</span>
+              <span>{form.nextAction || 'Prepare validation pack'}</span>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <Field label="Workflow status" tooltip="Collaboration status. This does not change projection or MACC calculations.">
+              <SelectInput value={form.status} onChange={(value) => update('status', value)}>
+                {measureStatusOptions.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
+              </SelectInput>
+            </Field>
+            <Field label="Responsible person" tooltip="Person who owns delivery after validation.">
+              <SelectInput
+                value={form.responsiblePersonId ?? ''}
+                onChange={(value) => update('responsiblePersonId', value)}
+              >
+                <option value="">Unassigned</option>
+                {people.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {personOptionLabel(person)}
+                  </option>
+                ))}
+              </SelectInput>
+            </Field>
+            <Field label="Validator" tooltip="Sustainability or finance reviewer for the validation workflow.">
+              <SelectInput
+                value={form.validatorPersonId ?? ''}
+                onChange={(value) => update('validatorPersonId', value)}
+              >
+                <option value="">Unassigned</option>
+                {people.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {personOptionLabel(person)}
+                  </option>
+                ))}
+              </SelectInput>
+            </Field>
+            <Field label="Due date" tooltip="Planning due date for the next validation or delivery action.">
+              <input
+                className="input"
+                type="date"
+                value={form.dueDate ?? ''}
+                onChange={(event) => update('dueDate', event.target.value)}
+              />
+            </Field>
+            <Field label="Progress %" tooltip="Delivery progress after validation and assignment.">
+              <NumberInput
+                value={form.progressPercent ?? 0}
+                min={0}
+                max={100}
+                step={5}
+                onChange={(value) => update('progressPercent', value)}
+              />
+            </Field>
+            <Field label="Validation stage" tooltip="Current validation or hand-off note shown in the measure portfolio.">
+              <TextInput
+                value={form.validationStage ?? ''}
+                onChange={(value) => update('validationStage', value)}
+              />
+            </Field>
+          </div>
+          <div className="mt-3">
+            <Field label="Next action" tooltip="Next owner action used to track delivery after validation.">
+              <TextInput value={form.nextAction ?? ''} onChange={(value) => update('nextAction', value)} />
+            </Field>
+          </div>
+        </section>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="surface-card rounded-md p-3">
+            <p className="text-xs font-semibold uppercase text-slate-500">Annual saving</p>
+            <p className="mt-2 text-xl font-semibold text-shi-blue">
+              {formatCurrency(finance?.annualAvoidedEnergyCostUsd ?? 0)}
+            </p>
+          </div>
+          <div className="surface-card rounded-md p-3">
+            <p className="text-xs font-semibold uppercase text-slate-500">Annual reduction</p>
+            <p className="mt-2 text-xl font-semibold text-shi-blue">
+              {formatEmissions(finance?.annualEmissionsReductionTco2e ?? 0, 1)}
+            </p>
+          </div>
+          <div className="surface-card rounded-md p-3">
+            <p className="text-xs font-semibold uppercase text-slate-500">Payback</p>
+            <p className="mt-2 text-xl font-semibold text-shi-blue">
+              {Number.isFinite(finance?.simplePaybackYears)
+                ? `${finance.simplePaybackYears.toFixed(1)} years`
+                : 'Not paid back'}
+            </p>
+          </div>
+        </div>
+
         <Field label="Measure name">
           <TextInput value={form.name} onChange={(value) => update('name', value)} />
         </Field>
@@ -247,66 +425,12 @@ export default function MeasureForm({
             />
           </Field>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field
-            label="Owner"
-            tooltip="Internal team accountable for the measure record and its validation pack."
-          >
-            <TextInput value={form.owner} onChange={(value) => update('owner', value)} />
-          </Field>
-          <Field
-            label="Status"
-            tooltip="Workflow stage from proposal through validation, approval, delivery and implementation."
-          >
-            <SelectInput value={form.status} onChange={(value) => update('status', value)}>
-              {measureStatusOptions.map((status) => (
-                <option key={status.value} value={status.value}>
-                  {status.label}
-                </option>
-              ))}
-            </SelectInput>
-          </Field>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
-          <Field
-            label="Responsible person"
-            tooltip="Person or role that receives the approved measure and owns delivery progress."
-          >
-            <TextInput
-              value={form.responsiblePerson ?? form.assignedTo ?? form.owner ?? ''}
-              onChange={(value) => update('responsiblePerson', value)}
-            />
-          </Field>
-          <Field
-            label="Progress %"
-            tooltip="Delivery progress after validation and assignment. This is a planning tracker, not a calculation driver."
-          >
-            <NumberInput
-              value={form.progressPercent ?? 0}
-              min={0}
-              max={100}
-              step={5}
-              onChange={(value) => update('progressPercent', value)}
-            />
-          </Field>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field
-            label="Validation stage"
-            tooltip="Current validation or hand-off note shown in the measure portfolio."
-          >
-            <TextInput
-              value={form.validationStage ?? ''}
-              onChange={(value) => update('validationStage', value)}
-            />
-          </Field>
-          <Field
-            label="Next action"
-            tooltip="Next owner action used to track delivery after validation."
-          >
-            <TextInput value={form.nextAction ?? ''} onChange={(value) => update('nextAction', value)} />
-          </Field>
-        </div>
+        <Field
+          label="Owner"
+          tooltip="Internal team accountable for the measure record and its validation pack."
+        >
+          <TextInput value={form.owner} onChange={(value) => update('owner', value)} />
+        </Field>
         <label className="flex items-center gap-2 text-sm text-shi-blue">
           <input
             type="checkbox"

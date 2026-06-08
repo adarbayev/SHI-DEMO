@@ -1,10 +1,10 @@
-import { CheckCircle, Copy, Pencil, Send, Trash2 } from 'lucide-react'
+import { ArrowRight, Copy, Pencil, Trash2 } from 'lucide-react'
 import { formatCompactCurrency, formatCurrency, formatEmissions, formatPayback } from '../lib/formatters'
 import {
-  canSubmitForValidation,
-  canValidateMeasure,
+  canAdvanceMeasure,
   getMeasureProgress,
   getMeasureStatusLabel,
+  getNextWorkflowAction,
   getResponsiblePerson,
 } from '../lib/measureWorkflow'
 
@@ -13,11 +13,11 @@ export default function MeasurePortfolioTable({
   sites,
   scenarios,
   financeRows,
+  people,
   onEdit,
   onDuplicate,
   onDelete,
-  onSubmitForValidation,
-  onValidate,
+  onAdvanceWorkflow,
 }) {
   const siteById = new Map(sites.map((site) => [site.id, site]))
   const scenarioById = new Map(scenarios.map((scenario) => [scenario.id, scenario]))
@@ -30,7 +30,7 @@ export default function MeasurePortfolioTable({
         <span>{measures.length} measures across validation and delivery stages</span>
       </div>
       <div className="mt-4 overflow-x-auto">
-        <table className="data-table min-w-[1540px]">
+        <table className="data-table min-w-[1600px]">
           <thead>
             <tr>
               <th>Measure</th>
@@ -55,6 +55,7 @@ export default function MeasurePortfolioTable({
             {measures.map((measure) => {
               const finance = financeByMeasure.get(measure.id)
               const progress = getMeasureProgress(measure)
+              const workflowAction = getNextWorkflowAction(measure)
               return (
                 <tr key={measure.id}>
                   <td>
@@ -75,7 +76,9 @@ export default function MeasurePortfolioTable({
                     <span className="status-badge">{getMeasureStatusLabel(measure.status)}</span>
                   </td>
                   <td>
-                    <span className="font-semibold text-shi-blue">{getResponsiblePerson(measure)}</span>
+                    <span className="font-semibold text-shi-blue">
+                      {getResponsiblePerson(measure, people)}
+                    </span>
                     <span className="block text-xs text-slate-500">
                       {measure.validationStage ?? 'Not submitted'}
                     </span>
@@ -98,24 +101,14 @@ export default function MeasurePortfolioTable({
                   </td>
                   <td>
                     <div className="flex gap-1">
-                      {canSubmitForValidation(measure) ? (
+                      {canAdvanceMeasure(measure) ? (
                         <button
                           type="button"
                           className="icon-button"
-                          title="Submit for validation"
-                          onClick={() => onSubmitForValidation(measure.id)}
+                          title={workflowAction.actionLabel}
+                          onClick={() => onAdvanceWorkflow(measure.id)}
                         >
-                          <Send size={15} />
-                        </button>
-                      ) : null}
-                      {canValidateMeasure(measure) ? (
-                        <button
-                          type="button"
-                          className="icon-button"
-                          title="Validate and assign"
-                          onClick={() => onValidate(measure.id)}
-                        >
-                          <CheckCircle size={15} />
+                          <ArrowRight size={15} />
                         </button>
                       ) : null}
                       <button
