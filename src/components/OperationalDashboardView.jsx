@@ -1,4 +1,14 @@
 import { useMemo, useState } from 'react'
+import clsx from 'clsx'
+import {
+  BadgeDollarSign,
+  Flame,
+  Gauge,
+  MapPinned,
+  TrendingDown,
+  TrendingUp,
+  Zap,
+} from 'lucide-react'
 import {
   Bar,
   BarChart,
@@ -28,7 +38,6 @@ import {
 } from '../lib/formatters'
 import AssumptionsTable from './AssumptionsTable'
 import ChartFrame from './ChartFrame'
-import MetricCard from './MetricCard'
 import SiteOperationsMap from './SiteOperationsMap'
 
 function axisMwh(value) {
@@ -47,6 +56,62 @@ function ChartPanel({ title, subtitle, children, height = 280 }) {
       </ChartFrame>
     </section>
   )
+}
+
+function tileToneClass(tone) {
+  if (tone === 'accent') return 'border-shi-accent/30 bg-gradient-to-br from-white to-blue-50/70'
+  if (tone === 'risk') return 'border-shi-orange/35 bg-gradient-to-br from-white to-orange-50/70'
+  if (tone === 'success') return 'border-shi-teal/35 bg-gradient-to-br from-white to-teal-50/70'
+  return 'border-slate-200/80 bg-gradient-to-br from-white to-slate-50/80'
+}
+
+function iconToneClass(tone) {
+  if (tone === 'risk') return 'bg-shi-orange/10 text-shi-orange'
+  if (tone === 'success') return 'bg-shi-teal/10 text-shi-teal'
+  if (tone === 'accent') return 'bg-shi-accent/10 text-shi-accent'
+  return 'bg-slate-100 text-slate-500'
+}
+
+function DashboardKpiTile({ label, value, detail, tone = 'default', icon: Icon }) {
+  return (
+    <div className={clsx('surface-card rounded-md p-3 transition hover:-translate-y-0.5', tileToneClass(tone))}>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[11px] font-semibold uppercase leading-tight text-slate-500">{label}</p>
+        {Icon ? (
+          <span className={clsx('inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md', iconToneClass(tone))}>
+            <Icon size={16} aria-hidden="true" />
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-2 break-words text-xl font-semibold leading-tight text-shi-blue">{value}</p>
+      {detail ? <p className="mt-2 text-xs leading-snug text-slate-500">{detail}</p> : null}
+    </div>
+  )
+}
+
+function InsightTile({ label, value, detail, tone = 'default', icon: Icon }) {
+  return (
+    <div className={clsx('surface-card rounded-md p-3', tileToneClass(tone))}>
+      <div className="flex items-start gap-3">
+        {Icon ? (
+          <span className={clsx('mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md', iconToneClass(tone))}>
+            <Icon size={16} aria-hidden="true" />
+          </span>
+        ) : null}
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase leading-tight text-slate-500">{label}</p>
+          <p className="mt-1 break-words text-lg font-semibold leading-tight text-shi-blue">{value}</p>
+          <p className="mt-1 text-xs leading-snug text-slate-500">{detail}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function signedPercent(value) {
+  const formatted = formatPercent(Math.abs(value))
+  if (!Number.isFinite(value) || value === 0) return formatted
+  return `${value > 0 ? '+' : '-'}${formatted}`
 }
 
 function ElectricityTrendChart({ data }) {
@@ -171,15 +236,48 @@ export default function OperationalDashboardView({ state }) {
     () => getHotspotRows(filteredRows, kpis.latest.year),
     [filteredRows, kpis.latest.year],
   )
-  const topEmissionsRows = useMemo(
-    () => getHotspotRows(enrichedRows, kpis.latest.year).slice(0, 5),
+  const allHotspotRows = useMemo(
+    () => getHotspotRows(enrichedRows, kpis.latest.year),
     [enrichedRows, kpis.latest.year],
   )
+  const topEmissionsRows = useMemo(
+    () => allHotspotRows.slice(0, 5),
+    [allHotspotRows],
+  )
+  const latestYearSummary = useMemo(
+    () => fuelMixRows.find((row) => row.year === kpis.latest.year) ?? null,
+    [fuelMixRows, kpis.latest.year],
+  )
+  const selectedHotspotRow = selectedSiteId
+    ? allHotspotRows.find((row) => row.siteId === selectedSiteId)
+    : allHotspotRows[0]
+  const allLatestYearEmissions = allHotspotRows.reduce(
+    (sum, row) => sum + row.totalEmissionsTco2e,
+    0,
+  )
+  const latestPeriodElectricityShare =
+    kpis.latestPeriod.totalEnergyMWh > 0
+      ? kpis.latestPeriod.electricityMWh / kpis.latestPeriod.totalEnergyMWh
+      : 0
+  const annualElectricityShare =
+    latestYearSummary?.totalEnergyMWh > 0
+      ? latestYearSummary.electricityMWh / latestYearSummary.totalEnergyMWh
+      : 0
+  const annualCostIntensity =
+    latestYearSummary?.totalEnergyMWh > 0
+      ? latestYearSummary.energyCostUsd / latestYearSummary.totalEnergyMWh
+      : 0
+  const hotspotConcentration =
+    allLatestYearEmissions > 0 && selectedHotspotRow
+      ? selectedHotspotRow.totalEmissionsTco2e / allLatestYearEmissions
+      : 0
+  const energyMovementTone =
+    kpis.yoyEnergyChange > 0.03 ? 'risk' : kpis.yoyEnergyChange < 0 ? 'success' : 'default'
 
   return (
     <div className="space-y-5">
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.55fr)]">
-        <section className="panel">
+      <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.28fr)_minmax(360px,0.72fr)]">
+        <section className="panel h-fit">
           <div className="section-heading">
             <p>Operational site map</p>
             <span>{selectedSite ? selectedSite.name : 'All sites'} | {kpis.latest.year}</span>
@@ -210,43 +308,93 @@ export default function OperationalDashboardView({ state }) {
               onSelectSite={setSelectedSiteId}
             />
           </div>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium text-slate-500">
+            <span className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white/75 px-2.5 py-1">
+              <span className="h-2.5 w-2.5 rounded-full bg-shi-orange" /> High hotspot
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white/75 px-2.5 py-1">
+              <span className="h-2.5 w-2.5 rounded-full bg-shi-teal" /> Medium
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white/75 px-2.5 py-1">
+              <span className="h-2.5 w-2.5 rounded-full bg-shi-lime" /> Watch
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-md border border-shi-accent/30 bg-shi-accent/5 px-2.5 py-1 text-shi-blue">
+              <span className="h-2.5 w-2.5 rounded-full bg-shi-accent" /> Selected site
+            </span>
+          </div>
         </section>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-          <MetricCard
+        <div className="grid gap-3 sm:grid-cols-2">
+          <DashboardKpiTile
             label="Latest period energy"
             value={formatMwh(kpis.latestPeriod.totalEnergyMWh, 1)}
-            detail={kpis.latest.period}
+            detail={`${kpis.latest.period} reported period`}
             tone="accent"
+            icon={Gauge}
           />
-          <MetricCard
+          <DashboardKpiTile
             label="Electricity"
             value={formatMwh(kpis.latestPeriod.electricityMWh, 1)}
-            detail={`YoY energy ${formatPercent(kpis.yoyEnergyChange)}`}
+            detail={`Period share ${formatPercent(latestPeriodElectricityShare)}`}
+            icon={Zap}
           />
-          <MetricCard
+          <DashboardKpiTile
             label="Energy cost"
             value={formatCurrency(kpis.latestPeriod.energyCostUsd)}
-            detail="Latest reported month"
+            detail={`${formatCurrency(annualCostIntensity, 0)}/MWh annual intensity`}
+            icon={BadgeDollarSign}
           />
-          <MetricCard
+          <DashboardKpiTile
             label="Scope 1 + 2 emissions"
             value={formatEmissions(kpis.latestPeriod.totalEmissionsTco2e, 1)}
             detail="Location-based"
             tone="risk"
+            icon={Flame}
           />
-          <MetricCard
+          <DashboardKpiTile
             label="Renewable electricity match"
             value={formatPercent(kpis.latestPeriod.renewableElectricityMatchedPercent)}
             detail="Weighted by electricity"
             tone="success"
+            icon={TrendingDown}
           />
-          <MetricCard
+          <DashboardKpiTile
             label="Top hotspot"
             value={kpis.topHotspot?.siteShortName ?? 'n/a'}
             detail={kpis.topHotspot ? formatEmissions(kpis.topHotspot.totalEmissionsTco2e, 1) : ''}
+            icon={MapPinned}
           />
         </div>
+      </section>
+
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <InsightTile
+          label="Annual energy movement"
+          value={signedPercent(kpis.yoyEnergyChange)}
+          detail={`${kpis.latest.year} versus ${kpis.latest.year - 1}`}
+          tone={energyMovementTone}
+          icon={kpis.yoyEnergyChange > 0 ? TrendingUp : TrendingDown}
+        />
+        <InsightTile
+          label="Electricity dependency"
+          value={formatPercent(annualElectricityShare)}
+          detail={`${selectedSite ? selectedSite.siteShortName : 'Portfolio'} annual energy mix`}
+          tone="accent"
+          icon={Zap}
+        />
+        <InsightTile
+          label="Cost intensity"
+          value={`${formatCurrency(annualCostIntensity, 0)}/MWh`}
+          detail={`${kpis.latest.year} blended energy cost`}
+          icon={BadgeDollarSign}
+        />
+        <InsightTile
+          label="Hotspot concentration"
+          value={formatPercent(hotspotConcentration)}
+          detail={`${selectedHotspotRow?.siteShortName ?? 'Top site'} share of portfolio emissions`}
+          tone="risk"
+          icon={Flame}
+        />
       </section>
 
       <div className="grid gap-5 xl:grid-cols-2">

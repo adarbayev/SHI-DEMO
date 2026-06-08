@@ -42,13 +42,18 @@ export default function SiteOperationsMap({ siteRows, selectedSiteId, onSelectSi
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const layerRef = useRef(null)
+  const fittedSitesRef = useRef('')
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return undefined
 
     const map = L.map(containerRef.current, {
       attributionControl: true,
-      scrollWheelZoom: false,
+      doubleClickZoom: true,
+      scrollWheelZoom: true,
+      touchZoom: true,
+      wheelDebounceTime: 20,
+      wheelPxPerZoomLevel: 70,
       worldCopyJump: true,
     }).setView([31, 0], 2)
 
@@ -106,11 +111,13 @@ export default function SiteOperationsMap({ siteRows, selectedSiteId, onSelectSi
       bounds.push([row.latitude, row.longitude])
     }
 
-    if (bounds.length > 0) {
+    const boundsKey = siteRows.map((row) => row.siteId).join('|')
+    if (bounds.length > 0 && boundsKey !== fittedSitesRef.current) {
       map.fitBounds(bounds, { padding: [28, 28], maxZoom: 4 })
+      fittedSitesRef.current = boundsKey
       setTimeout(() => map.invalidateSize(), 0)
     }
   }, [siteRows, selectedSiteId, onSelectSite])
 
-  return <div ref={containerRef} className="operations-map h-[430px] min-h-[360px] w-full rounded-md" />
+  return <div ref={containerRef} className="operations-map h-[340px] min-h-[320px] w-full rounded-md sm:h-[360px]" />
 }
