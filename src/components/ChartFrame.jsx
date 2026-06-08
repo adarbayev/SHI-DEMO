@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 
-export default function ChartFrame({ className, children }) {
+export default function ChartFrame({ className, children, style }) {
   const ref = useRef(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
 
@@ -44,7 +44,7 @@ export default function ChartFrame({ className, children }) {
   }, [])
 
   return (
-    <div ref={ref} className={clsx('w-full max-w-full min-w-0', className)}>
+    <div ref={ref} className={clsx('w-full max-w-full min-w-0', className)} style={style}>
       {size.width > 0 && size.height > 0 ? children(size) : null}
     </div>
   )

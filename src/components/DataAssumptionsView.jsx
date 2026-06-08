@@ -30,9 +30,102 @@ export default function DataAssumptionsView({ state, baselineRowsWithEmissions }
     ...row,
     siteName: state.sites.find((site) => site.id === row.siteId)?.name ?? row.siteId,
   }))
+  const operationalRowsForBaselineYear = state.operationalMonthlyData.filter(
+    (row) => row.year === startYear,
+  )
+  const operationalSources = [
+    ...new Set(state.operationalMonthlyData.map((row) => row.sourceSystem)),
+  ].join(' | ')
+  const latestOperationalPeriod = state.operationalMonthlyData.reduce(
+    (latest, row) => {
+      if (row.year > latest.year || (row.year === latest.year && row.month > latest.month)) {
+        return { year: row.year, month: row.month }
+      }
+      return latest
+    },
+    { year: 0, month: 0 },
+  )
+  const operationalTotalEnergy = operationalRowsForBaselineYear.reduce(
+    (sum, row) => sum + row.electricityMWh + row.naturalGasMWh + row.dieselMWh + row.petrolMWh,
+    0,
+  )
+  const baselineTotalEnergy = state.baselineEnergy.reduce(
+    (sum, row) => sum + row.electricityMWh + row.naturalGasMWh + row.dieselMWh + row.petrolMWh,
+    0,
+  )
+  const operationalElectricity = operationalRowsForBaselineYear.reduce(
+    (sum, row) => sum + row.electricityMWh,
+    0,
+  )
+  const baselineElectricity = state.baselineEnergy.reduce(
+    (sum, row) => sum + row.electricityMWh,
+    0,
+  )
+  const operationalReconciliationRows = [
+    {
+      metric: 'Total energy',
+      operational: operationalTotalEnergy,
+      scenario: baselineTotalEnergy,
+      delta:
+        Math.abs(operationalTotalEnergy - baselineTotalEnergy) < 0.001
+          ? 0
+          : operationalTotalEnergy - baselineTotalEnergy,
+    },
+    {
+      metric: 'Electricity',
+      operational: operationalElectricity,
+      scenario: baselineElectricity,
+      delta:
+        Math.abs(operationalElectricity - baselineElectricity) < 0.001
+          ? 0
+          : operationalElectricity - baselineElectricity,
+    },
+  ]
 
   return (
     <div className="space-y-5">
+      <section className="panel">
+        <div className="section-heading">
+          <p>Operational data layer</p>
+          <span>Monthly seeded data feeding live dashboard</span>
+        </div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+          <div className="grid gap-3 text-sm text-slate-600">
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">Data grain</p>
+              <p className="mt-1 font-semibold text-shi-blue">Monthly | 2023-2025</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">Latest period</p>
+              <p className="mt-1 font-semibold text-shi-blue">
+                {latestOperationalPeriod.year}-{String(latestOperationalPeriod.month).padStart(2, '0')}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">Source systems</p>
+              <p className="mt-1 text-slate-600">{operationalSources}</p>
+            </div>
+          </div>
+          <AssumptionsTable
+            columns={[
+              { key: 'metric', label: 'Metric' },
+              {
+                key: 'operational',
+                label: `${startYear} operational aggregate`,
+                render: (row) => formatMwh(row.operational),
+              },
+              {
+                key: 'scenario',
+                label: 'Scenario baseline',
+                render: (row) => formatMwh(row.scenario),
+              },
+              { key: 'delta', label: 'Delta', render: (row) => formatMwh(row.delta) },
+            ]}
+            rows={operationalReconciliationRows}
+          />
+        </div>
+      </section>
+
       <section className="panel">
         <div className="section-heading">
           <p>Site list</p>

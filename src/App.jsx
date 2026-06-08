@@ -2,6 +2,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react'
 import DataAssumptionsView from './components/DataAssumptionsView'
 import MaccFinanceView from './components/MaccFinanceView'
 import MeasurePlannerView from './components/MeasurePlannerView'
+import OperationalDashboardView from './components/OperationalDashboardView'
 import ScenarioSetupView from './components/ScenarioSetupView'
 import TopNav from './components/TopNav'
 import { createInitialState } from './data/initialState'
@@ -140,6 +141,7 @@ function initialiseState() {
     sites: initial.sites,
     legalEntities: initial.legalEntities,
     baselineEnergy: initial.baselineEnergy,
+    operationalMonthlyData: initial.operationalMonthlyData,
     emissionFactors: initial.emissionFactors,
     targetSettings: normaliseTargetSettings({
       ...initial.targetSettings,
@@ -298,6 +300,7 @@ export default function App() {
             onUpdateScenario={(scenario) => dispatch({ type: 'UPDATE_SCENARIO', scenario })}
           />
         ) : null}
+        {activeTab === 'operations' ? <OperationalDashboardView state={state} /> : null}
         {activeTab === 'measures' ? (
           <MeasurePlannerView
             state={state}

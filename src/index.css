@@ -129,4 +129,27 @@ textarea {
   .surface-card:hover {
     box-shadow: 0 18px 44px rgba(37, 55, 70, 0.12);
   }
+
+  .operations-map {
+    background: #dbe7ed;
+  }
+
+  .operations-map.leaflet-container {
+    font-family: Roboto, Inter, ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .operations-map .leaflet-control-attribution {
+    font-size: 10px;
+  }
+
+  .leaflet-popup-content-wrapper {
+    border-radius: 8px;
+    border: 1px solid rgba(203, 213, 225, 0.9);
+    box-shadow: 0 18px 45px rgba(37, 55, 70, 0.18);
+  }
+
+  .leaflet-popup-content {
+    margin: 12px;
+    color: #253746;
+  }
 }

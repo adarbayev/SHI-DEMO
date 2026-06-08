@@ -4,6 +4,7 @@ import ShiLogo from './ShiLogo'
 
 const tabs = [
   { id: 'scenario', label: 'Scenario setup' },
+  { id: 'operations', label: 'Operational dashboard' },
   { id: 'measures', label: 'Measure planner' },
   { id: 'finance', label: 'MACC and Finance' },
   { id: 'data', label: 'Data and assumptions' },
